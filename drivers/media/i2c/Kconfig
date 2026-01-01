@@ -707,6 +707,15 @@ config VIDEO_S5K5BAF
 	  This is a V4L2 sensor driver for Samsung S5K5BAF 2M
 	  camera sensor with an embedded SoC image signal processor.
 
+config VIDEO_S5K5E9
+	tristate "Samsung S5K5E9 sensor support"
+	help
+	  This is a V4L2 sensor driver for Samsung S5K5E9 raw
+	  camera sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called s5k5e9.
+
 config VIDEO_S5K6A3
 	tristate "Samsung S5K6A3 sensor support"
 	help
@@ -814,6 +823,18 @@ config VIDEO_DW9768
 	  This is a driver for the DW9768 camera lens voice coil.
 	  DW9768 is a 10 bit DAC with 100mA output current sink
 	  capability. This is designed for linear control of
+	  voice coil motors, controlled via I2C serial interface.
+
+config VIDEO_DW9800V
+	tristate "DW9800V lens voice coil support"
+	depends on I2C && VIDEO_DEV
+	select MEDIA_CONTROLLER
+	select VIDEO_V4L2_SUBDEV_API
+	select V4L2_FWNODE
+	help
+	  This is a driver for the DW9800V camera lens voice coil.
+	  DW9800W is a 10 bit DAC with ±130mA output current sink
+	  capability. This is designed for linear control of bi-direction
 	  voice coil motors, controlled via I2C serial interface.
 
 config VIDEO_DW9807_VCM
