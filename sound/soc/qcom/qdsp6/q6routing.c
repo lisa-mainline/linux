@@ -468,8 +468,7 @@ EXPORT_SYMBOL_GPL(q6routing_stream_close);
 static int msm_routing_get_audio_mixer(struct snd_kcontrol *kcontrol,
 				       struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_dapm_context *dapm =
-	    snd_soc_dapm_kcontrol_dapm(kcontrol);
+	struct snd_soc_dapm_context *dapm = snd_soc_dapm_kcontrol_to_dapm(kcontrol);
 	struct soc_mixer_control *mc =
 	    (struct soc_mixer_control *)kcontrol->private_value;
 	int session_id = mc->shift;
@@ -488,8 +487,7 @@ static int msm_routing_get_audio_mixer(struct snd_kcontrol *kcontrol,
 static int msm_routing_put_audio_mixer(struct snd_kcontrol *kcontrol,
 				       struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_dapm_context *dapm =
-				    snd_soc_dapm_kcontrol_dapm(kcontrol);
+	struct snd_soc_dapm_context *dapm = snd_soc_dapm_kcontrol_to_dapm(kcontrol);
 	struct snd_soc_component *c = snd_soc_dapm_to_component(dapm);
 	struct msm_routing_data *data = dev_get_drvdata(c->dev);
 	struct soc_mixer_control *mc =
@@ -1085,6 +1083,8 @@ static int routing_hw_params(struct snd_soc_component *component,
 	case SNDRV_PCM_FORMAT_S24_LE:
 			session->bits_per_sample = 24;
 		break;
+	case SNDRV_PCM_FORMAT_S32_LE:
+			session->bits_per_sample = 24;
 	default:
 		break;
 	}
@@ -1135,7 +1135,7 @@ static int q6pcm_routing_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 
-	routing_data = kzalloc(sizeof(*routing_data), GFP_KERNEL);
+	routing_data = kzalloc_obj(*routing_data);
 	if (!routing_data)
 		return -ENOMEM;
 

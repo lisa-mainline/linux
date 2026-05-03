@@ -6,12 +6,11 @@
 
 /dts-v1/;
 
-#include <dt-bindings/arm/qcom,ids.h>
-#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/iio/qcom,spmi-adc7-pm7325.h>
 #include <dt-bindings/iio/qcom,spmi-adc7-pm8350b.h>
 #include <dt-bindings/iio/qcom,spmi-adc7-pmk8350.h>
 #include <dt-bindings/leds/common.h>
+#include <dt-bindings/media/video-interfaces.h>
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 #include <dt-bindings/regulator/qcom,rpmh-regulator.h>
 #include <dt-bindings/sound/qcom,q6afe.h>
@@ -831,6 +830,33 @@
 	};
 };
 
+&camss {
+	vdda-phy-supply = <&vreg_l10c_0p88>;
+	vdda-pll-supply = <&vreg_l6b_1p2>;
+
+	status = "okay";
+
+	ports {
+		port@0 {
+			csiphy0_ep: endpoint {
+				clock-lanes = <7>;
+				data-lanes = <0 1 2 3>;
+				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+				remote-endpoint = <&camera_imx471_ep>;
+			};
+		};
+
+		port@2 {
+			csiphy2_ep: endpoint {
+				clock-lanes = <7>;
+				data-lanes = <0 1 2 3>;
+				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+				remote-endpoint = <&camera_s5kjn1_ep>;
+			};
+		};
+	};
+};
+
 &cci0 {
 	/*
 	 * cci0_i2c1 bus is unused and GPIO 71&72 are repurposed.
@@ -843,7 +869,32 @@
 };
 
 &cci0_i2c0 {
-	/* D-PHY sony,imx471 (Front) @ 0x1a */
+	camera@1a {
+		compatible = "sony,imx471";
+		reg = <0x1a>;
+
+		vddio-supply = <&vreg_cam_vio_1p8>;
+		vddd-supply = <&vreg_camf_vdig_1p1>;
+		vdda-supply = <&vreg_camf_vana_2p8>;
+
+		clocks = <&camcc CAM_CC_MCLK0_CLK>;
+		clock-frequency = <19200000>;
+
+		reset-gpios = <&tlmm 20 GPIO_ACTIVE_LOW>;
+		pinctrl-0 = <&mclk0_active>;
+		pinctrl-names = "default";
+
+		orientation = <0>; /* Front facing */
+		rotation = <270>;
+
+		port {
+			camera_imx471_ep: endpoint {
+				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <600000000>;
+				remote-endpoint = <&csiphy0_ep>;
+			};
+		};
+	};
 
 	camf_p24c64f: eeprom@52 {
 		compatible = "puya,p24c64f",
@@ -860,7 +911,34 @@
 
 &cci1_i2c0 {
 	/* actuator (For Ultra Wide sensor) @ 0xc */
-	/* D-PHY samsung,s5kjn1 (Ultra Wide) @ 0x2d */
+
+	camera@2d {
+		compatible = "samsung,s5kjn1";
+		reg = <0x2d>;
+
+		vddio-supply = <&vreg_cam_vio_1p8>;
+		vddd-supply = <&vreg_camu_vdig_1p1>;
+		vdda-supply = <&vreg_camu_vana_2p8>;
+
+		clocks = <&camcc CAM_CC_MCLK2_CLK>;
+		clock-frequency = <19200000>;
+
+		reset-gpios = <&tlmm 77 GPIO_ACTIVE_LOW>;
+		pinctrl-0 = <&mclk2_active>;
+		pinctrl-names = "default";
+
+		orientation = <1>; /* Rear facing */
+		rotation = <90>;
+
+		port {
+			camera_s5kjn1_ep: endpoint {
+				data-lanes = <1 2 3 4>;
+				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+				link-frequencies = /bits/ 64 <600000000>;
+				remote-endpoint = <&csiphy2_ep>;
+			};
+		};
+	};
 
 	camu_gt24p128e: eeprom@51 {
 		compatible = "giantec,gt24p128e",
@@ -943,8 +1021,23 @@
 	clock-frequency = <100000>;
 	status = "okay";
 
-	/* nxp,tfa9873 (EAR speaker codec) @ 34 */
-	/* nxp,tfa9873 (Main speaker codec) @ 35 */
+	tfa9873_l: codec@34 { /* EAR */
+		compatible = "nxp,tfa9873",
+			     "nxp,tfa9872";
+		reg = <0x34>;
+		reset-gpio = <&tlmm 101 GPIO_ACTIVE_HIGH>;
+
+		#sound-dai-cells = <1>;
+	};
+
+	tfa9873_r: codec@35 { /* SPK */
+		compatible = "nxp,tfa9873",
+			     "nxp,tfa9872";
+		reg = <0x35>;
+		reset-gpio = <&tlmm 101 GPIO_ACTIVE_HIGH>;
+
+		#sound-dai-cells = <1>;
+	};
 };
 
 &i2c9 {
@@ -976,6 +1069,11 @@
 	firmware-name = "qcom/sm7325/nothing/spacewar/ipa_fws.mbn";
 
 	status = "okay";
+};
+
+&lpass_audiocc {
+	compatible = "qcom,qcm6490-lpassaudiocc";
+	/delete-property/ power-domains;
 };
 
 &mdss {
@@ -1269,10 +1367,77 @@
 	status = "okay";
 };
 
+&sound {
+	compatible = "qcom,sm7325-sndcard",
+		     "qcom,sm8250-sndcard";
+
+	model = "NP1";
+
+	pinctrl-0 = <&pri_mi2s_bck_active &pri_mi2s_din_active
+		     &pri_mi2s_dout_active &pri_mi2s_ws_active>;
+	pinctrl-1 = <&pri_mi2s_sleep>;
+	pinctrl-names = "default",
+			"sleep";
+
+	mm1-dai-link {
+		link-name = "MultiMedia1";
+
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
+		};
+	};
+
+	i2s-dai-link {
+		link-name = "I2S Playback";
+
+		cpu {
+			sound-dai = <&q6afedai PRIMARY_MI2S_RX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&tfa9873_l 0>, <&tfa9873_r 0>;
+		};
+	};
+};
+
 &spi13 {
 	status = "okay";
 
-	/* focaltech,ft3680 (Touchscreen) @ 0 */
+	focaltech@0 {
+		compatible = "focaltech,fts_ts";
+		reg = <0x0>;
+
+		spi-max-frequency = <6000000>;
+
+		interrupt-parent = <&tlmm>;
+		interrupts = <81 0x2008>;
+		reset-gpios = <&tlmm 105 GPIO_ACTIVE_HIGH>;
+		focaltech,irq-gpio = <&tlmm 81 0x2008>;
+		focaltech,display-coords = <0 0 1080 2400>;
+		focaltech,max-touch-number = <10>;
+		focaltech,ic-type = <0x3658d488>;
+
+		vdd-supply = <&vdd_ts>;
+		iovdd-supply = <&vreg_l8c_1p8>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&ts_int_n>,
+			    <&ts_reset_n>;
+
+		focaltech,trusted-touch-mode = "vm_mode";
+		focaltech,touch-environment = "pvm";
+		focaltech,trusted-touch-spi-irq = <601>;
+		focaltech,trusted-touch-io-bases = <0xf134000 0xf135000
+						    0xf136000 0xf137000
+						    0xf169000 0xf151000
+						    0xa94000 0x00a10000>;
+		focaltech,trusted-touch-io-sizes = <0x1000 0x1000 0x1000 0x1000
+						    0x1000 0x1000 0x1000 0x4000>;
+	};
 };
 
 &tlmm {
@@ -1338,6 +1503,20 @@
 		bias-disable;
 	};
 
+	mclk0_active: mclk0-active-state {
+		pins = "gpio64";
+		function = "cam_mclk";
+		bias-disable;
+		drive-strength = <2>;
+	};
+
+	mclk2_active: mclk2-active-state {
+		pins = "gpio66";
+		function = "cam_mclk";
+		bias-disable;
+		drive-strength = <2>;
+	};
+
 	mdp_vsync_p: mdp-vsync-p-state {
 		pins = "gpio80";
 		function = "mdp_vsync";
@@ -1356,6 +1535,60 @@
 		pins = "gpio86";
 		function = "gpio";
 		bias-pull-down;
+	};
+
+	pri_mi2s_bck_active: pri-mi2s-bck-active-state {
+		pins = "gpio97";
+		function = "mi2s0_sck";
+		drive-strength = <8>;
+		bias-disable;
+		output-high;
+	};
+
+	pri_mi2s_din_active: pri-mi2s-din-active-state {
+		pins = "gpio98";
+		function = "mi2s0_data0";
+		drive-strength = <8>;
+		bias-disable;
+		output-high;
+	};
+
+	pri_mi2s_dout_active: pri-mi2s-dout-active-state {
+		pins = "gpio99";
+		function = "mi2s0_data1";
+		drive-strength = <8>;
+		bias-disable;
+		output-high;
+	};
+
+	pri_mi2s_ws_active: pri-mi2s-ws-active-state {
+		pins = "gpio100";
+		function = "mi2s0_ws";
+		drive-strength = <8>;
+		bias-disable;
+		output-high;
+	};
+
+	pri_mi2s_sleep: pri-mi2s-sleep-state {
+		pins = "gpio97", "gpio98", "gpio99", "gpio100";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-down;
+		input-enable;
+	};
+
+	ts_int_n: ts-int-n-state {
+		pins = "gpio81";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	ts_reset_n: ts-reset-n-state {
+		pins = "gpio105";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
 	};
 };
 
@@ -1425,16 +1658,14 @@
 &usb_1 {
 	/* USB 2.0 only */
 	qcom,select-utmi-as-pipe-clk;
-	status = "okay";
-};
-
-&usb_1_dwc3 {
 	dr_mode = "otg";
 	usb-role-switch;
 	maximum-speed = "high-speed";
 	/* Remove USB3 phy */
 	phys = <&usb_1_hsphy>;
 	phy-names = "usb2-phy";
+
+	status = "okay";
 };
 
 &usb_1_dwc3_hs {
