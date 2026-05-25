@@ -44,7 +44,8 @@
 		#size-cells = <2>;
 		ranges;
 
-		bootargs = "earlycon";
+		stdout-path = "serial0:115200n8";
+		bootargs = "earlycon console=ttyMSM0,115200";
 
 		framebuffer0: framebuffer@e1000000 {
 			compatible = "simple-framebuffer";
@@ -531,9 +532,10 @@
 		vdd-bob-supply = <&vph_pwr>;
 
 		/*
-		 * S2, S5, S10 are ARCs:
+		 * S2, S5, S7, S10 are ARCs:
 		 * S2 - cx.lvl,
 		 * S5 - mss.lvl,
+		 * S7 - gfx.lvl,
 		 * S10 - mx.lvl.
 		 */
 
@@ -811,6 +813,14 @@
 
 &gpi_dma1 {
 	status = "okay";
+};
+
+&gpu {
+	status = "okay";
+};
+
+&gpu_zap_shader {
+	firmware-name = "qcom/sm7325/xiaomi/lisa/a660_zap.mbn";
 };
 
 &i2c1 {
@@ -1579,6 +1589,8 @@
 };
 
 &usb_1 {
+	/* USB 2.0 only */
+	qcom,select-utmi-as-pipe-clk;
 	dr_mode = "otg";
 	usb-role-switch;
 	maximum-speed = "high-speed";
@@ -1586,8 +1598,6 @@
 	phys = <&usb_1_hsphy>;
 	phy-names = "usb2-phy";
 
-	/* USB 2.0 only */
-	qcom,select-utmi-as-pipe-clk;
 	status = "okay";
 };
 
